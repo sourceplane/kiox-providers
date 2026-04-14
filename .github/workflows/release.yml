@@ -1,0 +1,68 @@
+name: Release setup-kubectl
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Semantic version tag to package
+        required: true
+        default: v0.1.0
+  push:
+    tags:
+      - providers/setup-kubectl/v*
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PROVIDER_DIR: providers/setup-kubectl
+      PROVIDER_NAME: tinx-setup-kubectl
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        name: Resolve release metadata
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME##*/}"
+          fi
+
+          owner=$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')
+          push_ref="ghcr.io/${owner}/${PROVIDER_NAME}:${tag}"
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "push_ref=$push_ref" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: providers/setup-kubectl/go.mod
+
+      - name: Install tinx CLI
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          env -u RPROMPT GOBIN="$HOME/.local/bin" go install github.com/sourceplane/tinx/cmd/tinx@v0.3.2
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Authenticate to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release provider
+        working-directory: ${{ env.PROVIDER_DIR }}
+        run: |
+          tinx release \
+            --manifest provider.yaml \
+            --main ./cmd/tinx-provider-kubectl \
+            --dist dist \
+            --output oci \
+            --tag "${{ steps.meta.outputs.tag }}" \
+            --push "${{ steps.meta.outputs.push_ref }}"
