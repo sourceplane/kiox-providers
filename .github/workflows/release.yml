@@ -46,18 +46,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install tinx
-        uses: sourceplane/tinx-action@v2
+      - name: Release provider
+        uses: sourceplane/tinx-release-action@v2
         with:
           working-directory: ${{ env.PROVIDER_DIR }}
-
-      - name: Release provider
-        working-directory: ${{ env.PROVIDER_DIR }}
-        run: |
-          tinx release \
-            --manifest provider.yaml \
-            --main ./cmd/tinx-provider-kubectl \
-            --dist dist \
-            --output oci \
-            --tag "${{ steps.meta.outputs.tag }}" \
-            --push "${{ steps.meta.outputs.push_ref }}"
+          manifest: provider.yaml
+          main: ./cmd/tinx-provider-kubectl
+          output: oci
+          dist: dist
+          tag: ${{ steps.meta.outputs.tag }}
+          push: ${{ steps.meta.outputs.push_ref }}
