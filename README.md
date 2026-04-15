@@ -43,5 +43,5 @@ KUBECTL_VERSION=v1.30.6 tinx -w "$workspace_dir" exec -- kubectl version --clien
 
 The GitHub Actions setup is intentionally minimal:
 
-- `ci.yml` runs `go test` and `tinx release` for `providers/setup-kubectl`.
-- `release.yml` publishes the provider directly to GHCR with `tinx release --push`.
+- `ci.yml` runs `go test`, validates `tinx release`, and smoke-tests both transient providers and a workspace manifest through `sourceplane/tinx-action@v2`.
+- `release.yml` installs `tinx` through `sourceplane/tinx-action@v2` and publishes the provider with `tinx release --push`.

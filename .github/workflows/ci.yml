@@ -23,11 +23,34 @@ jobs:
         run: go test ./...
 
       - name: Validate release build
-        uses: sourceplane/tinx-release-action@v1
+        uses: sourceplane/tinx-action@v2
         with:
           working-directory: providers/setup-kubectl
-          manifest: provider.yaml
-          main: ./cmd/tinx-provider-kubectl
-          output: oci
-          dist: dist
-          tag: ci
+          run: |
+            tinx release \
+              --manifest provider.yaml \
+              --main ./cmd/tinx-provider-kubectl \
+              --dist dist \
+              --output oci \
+              --tag ci
+
+      - name: Smoke test transient providers
+        uses: sourceplane/tinx-action@v2
+        env:
+          KUBECTL_VERSION: v1.30.6
+        with:
+          working-directory: providers/setup-kubectl
+          providers: |
+            ${{ github.workspace }}/providers/setup-kubectl/oci as kubectl
+          run: |
+            kubectl version --client -o json
+
+      - name: Smoke test workspace manifest
+        uses: sourceplane/tinx-action@v2
+        env:
+          KUBECTL_VERSION: v1.30.6
+        with:
+          working-directory: providers/setup-kubectl
+          workspace: examples/workspace.local.tinx.yaml
+          run: |
+            kubectl version --client -o json
