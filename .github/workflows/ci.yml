@@ -23,16 +23,14 @@ jobs:
         run: go test ./...
 
       - name: Validate release build
-        uses: sourceplane/tinx-action@v2
+        uses: sourceplane/tinx-release-action@v2
         with:
           working-directory: providers/setup-kubectl
-          run: |
-            tinx release \
-              --manifest provider.yaml \
-              --main ./cmd/tinx-provider-kubectl \
-              --dist dist \
-              --output oci \
-              --tag ci
+          manifest: provider.yaml
+          main: ./cmd/tinx-provider-kubectl
+          output: oci
+          dist: dist
+          tag: ci
 
       - name: Smoke test transient providers
         uses: sourceplane/tinx-action@v2
