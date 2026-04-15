@@ -83,4 +83,4 @@ tinx release \
   --push ghcr.io/<org>/tinx-setup-kubectl:v0.1.0
 ```
 
-The GitHub Actions release workflow runs the same command and publishes straight to GHCR.
+The GitHub Actions release workflow installs `tinx` with `sourceplane/tinx-action@v2` and then runs the same command to publish straight to GHCR.
