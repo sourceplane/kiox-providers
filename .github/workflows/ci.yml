@@ -63,7 +63,11 @@ jobs:
           go-version-file: go.work
 
       - name: Install kiox
-        uses: sourceplane/kiox-action@v2
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          GOBIN="$HOME/.local/bin" go install github.com/sourceplane/kiox/cmd/kiox@latest
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/kiox" version
 
       - name: Run Go tests
         working-directory: ${{ matrix.provider_dir }}
@@ -80,7 +84,7 @@ jobs:
             --tag ci
 
       - name: Smoke test transient providers
-        uses: sourceplane/kiox-action@v2
+        working-directory: ${{ matrix.provider_dir }}
         env:
           KUBECTL_VERSION: ${{ matrix.kubectl_version }}
           AZURE_CLI_VERSION: ${{ matrix.azure_cli_version }}
@@ -88,17 +92,16 @@ jobs:
           KUSTOMIZE_VERSION: ${{ matrix.kustomize_version }}
           TERRAFORM_VERSION: ${{ matrix.terraform_version }}
           GCLOUD_VERSION: ${{ matrix.gcloud_version }}
-        with:
-          working-directory: ${{ matrix.provider_dir }}
-          providers: |
-            ${{ github.workspace }}/${{ matrix.provider_dir }}/oci as ${{ matrix.tool }}
-          run: |
-            kiox --workspace "$KIOX_WORKSPACE_ROOT" ls
-            kiox --workspace "$KIOX_WORKSPACE_ROOT" status
-            ${{ matrix.smoke_command }}
+        run: |
+          workspace_dir=$(mktemp -d)
+          trap 'rm -rf "$workspace_dir"' EXIT
+          kiox init "$workspace_dir" -p "$PWD/oci as ${{ matrix.tool }}"
+          kiox --workspace "$workspace_dir" ls
+          kiox --workspace "$workspace_dir" status
+          kiox --workspace "$workspace_dir" -- ${{ matrix.smoke_command }}
 
       - name: Smoke test workspace manifest
-        uses: sourceplane/kiox-action@v2
+        working-directory: ${{ matrix.provider_dir }}
         env:
           KUBECTL_VERSION: ${{ matrix.kubectl_version }}
           AZURE_CLI_VERSION: ${{ matrix.azure_cli_version }}
@@ -106,10 +109,11 @@ jobs:
           KUSTOMIZE_VERSION: ${{ matrix.kustomize_version }}
           TERRAFORM_VERSION: ${{ matrix.terraform_version }}
           GCLOUD_VERSION: ${{ matrix.gcloud_version }}
-        with:
-          working-directory: ${{ matrix.provider_dir }}
-          workspace: examples/workspace.local.kiox.yaml
-          run: |
-            kiox --workspace "$KIOX_WORKSPACE_ROOT" ls
-            kiox --workspace "$KIOX_WORKSPACE_ROOT" status
-            ${{ matrix.smoke_command }}
+        run: |
+          workspace_dir=$(mktemp -d)
+          trap 'rm -rf "$workspace_dir"' EXIT
+          cp examples/workspace.local.kiox.yaml "$workspace_dir/kiox.yaml"
+          kiox init "$workspace_dir"
+          kiox --workspace "$workspace_dir" ls
+          kiox --workspace "$workspace_dir" status
+          kiox --workspace "$workspace_dir" -- ${{ matrix.smoke_command }}

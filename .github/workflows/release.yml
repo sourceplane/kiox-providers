@@ -30,7 +30,11 @@ jobs:
           go-version-file: go.work
 
       - name: Install kiox
-        uses: sourceplane/kiox-action@v2
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          GOBIN="$HOME/.local/bin" go install github.com/sourceplane/kiox/cmd/kiox@latest
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/kiox" version
 
       - id: meta
         name: Resolve release metadata
