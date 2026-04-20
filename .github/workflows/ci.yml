@@ -95,7 +95,7 @@ jobs:
         run: |
           workspace_dir=$(mktemp -d)
           trap 'rm -rf "$workspace_dir"' EXIT
-          kiox init "$workspace_dir" -p "$PWD/oci as ${{ matrix.tool }}"
+          kiox init "$workspace_dir" -p "$PWD/oci" as "${{ matrix.tool }}"
           kiox --workspace "$workspace_dir" ls
           kiox --workspace "$workspace_dir" status
           kiox --workspace "$workspace_dir" -- ${{ matrix.smoke_command }}
@@ -110,7 +110,7 @@ jobs:
           TERRAFORM_VERSION: ${{ matrix.terraform_version }}
           GCLOUD_VERSION: ${{ matrix.gcloud_version }}
         run: |
-          workspace_dir=$(mktemp -d)
+          workspace_dir=$(mktemp -d "$PWD/.kiox-smoke.XXXXXX")
           trap 'rm -rf "$workspace_dir"' EXIT
           cp examples/workspace.local.kiox.yaml "$workspace_dir/kiox.yaml"
           kiox init "$workspace_dir"
