@@ -29,6 +29,9 @@ jobs:
         with:
           go-version-file: go.work
 
+      - name: Install kiox
+        uses: sourceplane/kiox-action@v2
+
       - id: meta
         name: Resolve release metadata
         run: |
@@ -61,12 +64,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release provider
-        uses: sourceplane/kiox-release-action@v1
-        with:
-          working-directory: ${{ steps.meta.outputs.provider_dir }}
-          manifest: provider.yaml
-          main: ${{ steps.meta.outputs.main }}
-          output: oci
-          dist: dist
-          tag: ${{ steps.meta.outputs.tag }}
-          push: ${{ steps.meta.outputs.push_ref }}
+        working-directory: ${{ steps.meta.outputs.provider_dir }}
+        run: |
+          kiox release \
+            --manifest provider.yaml \
+            --main "${{ steps.meta.outputs.main }}" \
+            --output oci \
+            --dist dist \
+            --tag "${{ steps.meta.outputs.tag }}" \
+            --push "${{ steps.meta.outputs.push_ref }}"

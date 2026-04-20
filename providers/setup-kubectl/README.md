@@ -90,4 +90,4 @@ kiox release \
   --push ghcr.io/<org>/setup-kubectl:v0.2.0
 ```
 
-The GitHub Actions release workflow uses `sourceplane/kiox-release-action@v1` to run the same command and publish straight to GHCR.
+The GitHub Actions release workflow installs `kiox` with `sourceplane/kiox-action@v2` and runs the same command directly to publish straight to GHCR.

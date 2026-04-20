@@ -63,5 +63,5 @@ HELM_VERSION=v4.1.4 kiox --workspace "$workspace_dir" -- helm version --template
 
 The GitHub Actions setup is intentionally minimal:
 
-- `ci.yml` runs a provider matrix over every checked-in provider on the runner each provider requires, executes `go test`, validates `kiox release` with `sourceplane/kiox-release-action@v1`, and smoke-tests both transient providers and workspace manifests through `sourceplane/kiox-action@v2`.
-- `release.yml` publishes any provider tagged as `providers/<provider>/v*` with `sourceplane/kiox-release-action@v1`.
+- `ci.yml` runs a provider matrix over every checked-in provider on the runner each provider requires, installs `kiox` with `sourceplane/kiox-action@v2`, executes `go test`, validates `kiox release` directly, and smoke-tests both transient providers and workspace manifests through `sourceplane/kiox-action@v2`.
+- `release.yml` installs `kiox` with `sourceplane/kiox-action@v2` and publishes any provider tagged as `providers/<provider>/v*` with a direct `kiox release --push ...` invocation.

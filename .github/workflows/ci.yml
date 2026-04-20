@@ -62,19 +62,22 @@ jobs:
         with:
           go-version-file: go.work
 
+      - name: Install kiox
+        uses: sourceplane/kiox-action@v2
+
       - name: Run Go tests
         working-directory: ${{ matrix.provider_dir }}
         run: go test ./...
 
       - name: Validate release build
-        uses: sourceplane/kiox-release-action@v1
-        with:
-          working-directory: ${{ matrix.provider_dir }}
-          manifest: provider.yaml
-          main: ${{ matrix.main }}
-          output: oci
-          dist: dist
-          tag: ci
+        working-directory: ${{ matrix.provider_dir }}
+        run: |
+          kiox release \
+            --manifest provider.yaml \
+            --main "${{ matrix.main }}" \
+            --output oci \
+            --dist dist \
+            --tag ci
 
       - name: Smoke test transient providers
         uses: sourceplane/kiox-action@v2
