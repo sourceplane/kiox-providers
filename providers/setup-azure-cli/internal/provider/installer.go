@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,6 +22,7 @@ const (
 	defaultStableVersion    = "2.85.0"
 	defaultToolName         = "az"
 	defaultReleaseAPIBase   = "https://api.github.com/repos/Azure/azure-cli/releases"
+	defaultReleasePageBase  = "https://github.com/Azure/azure-cli/releases"
 	installedVersionFile    = ".kiox-azure-cli-version"
 )
 
@@ -184,6 +186,13 @@ func resolveReleaseAsset(ctx context.Context, client *http.Client, cacheDir stri
 
 	payload, err := loadOrFetchRelease(ctx, client, cacheDir, releaseAPIURLs, cacheKey, version, latest)
 	if err != nil {
+		if !latest {
+			resolvedVersion, asset, fallbackErr := loadReleaseAssetFromPage(ctx, client, cacheDir, releaseAPIURLs, version, assetSuffix, archiveExt)
+			if fallbackErr == nil {
+				return resolvedVersion, asset, nil
+			}
+			return "", releaseAsset{}, fmt.Errorf("resolve Azure CLI release %s: %w; fallback from public release page failed: %v", version, err, fallbackErr)
+		}
 		return "", releaseAsset{}, err
 	}
 	resolvedVersion := releaseVersionFromTag(payload.TagName)
@@ -226,6 +235,43 @@ func loadOrFetchRelease(ctx context.Context, client *http.Client, cacheDir strin
 		return releasePayload{}, err
 	}
 	return payload, nil
+}
+
+func loadReleaseAssetFromPage(ctx context.Context, client *http.Client, cacheDir string, releaseAPIURLs []string, version, assetSuffix, archiveExt string) (string, releaseAsset, error) {
+	assetName := archiveFileName(version, assetSuffix, archiveExt)
+	pageURLs := taggedReleasePageURLs(releasePageBaseURLs(releaseAPIURLs), version)
+	pageData, err := loadOrFetchReleasePage(ctx, client, cacheDir, version, pageURLs)
+	if err != nil {
+		return "", releaseAsset{}, err
+	}
+	checksum, err := checksumForAsset(pageData, assetName)
+	if err != nil {
+		return "", releaseAsset{}, err
+	}
+	downloadURLs := taggedReleaseDownloadURLs(releasePageBaseURLs(releaseAPIURLs), version, assetName)
+	if len(downloadURLs) == 0 {
+		return "", releaseAsset{}, fmt.Errorf("no Azure CLI release download URLs available for %s", version)
+	}
+	return version, releaseAsset{
+		Name:               assetName,
+		Digest:             "sha256:" + checksum,
+		BrowserDownloadURL: downloadURLs[0],
+	}, nil
+}
+
+func loadOrFetchReleasePage(ctx context.Context, client *http.Client, cacheDir, version string, pageURLs []string) ([]byte, error) {
+	cachePath := filepath.Join(cacheDir, "releases", "pages", version+".html")
+	if data, err := os.ReadFile(cachePath); err == nil {
+		return data, nil
+	}
+	data, _, err := installutil.FetchFirst(ctx, client, pageURLs)
+	if err != nil {
+		return nil, err
+	}
+	if err := installutil.WriteAtomic(cachePath, data, 0o644); err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 func resolveInstallPaths(installDir, targetBin, launcherName string) (string, string, error) {
@@ -360,6 +406,50 @@ func latestReleaseURLs(releaseAPIURLs []string) []string {
 
 func taggedReleaseURLs(releaseAPIURLs []string, version string) []string {
 	return installutil.JoinURLPaths(releaseAPIURLs, "tags/azure-cli-"+version)
+}
+
+func releasePageBaseURLs(releaseAPIURLs []string) []string {
+	baseURLs := make([]string, 0, len(releaseAPIURLs))
+	seen := map[string]struct{}{}
+	for _, raw := range releaseAPIURLs {
+		trimmed := strings.TrimRight(strings.TrimSpace(raw), "/")
+		if trimmed == "" {
+			continue
+		}
+		resolved := trimmed
+		if parsed, err := url.Parse(trimmed); err == nil && strings.EqualFold(parsed.Host, "api.github.com") {
+			segments := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+			if len(segments) >= 4 && segments[0] == "repos" {
+				resolved = fmt.Sprintf("https://github.com/%s/%s/releases", segments[1], segments[2])
+			}
+		}
+		if _, ok := seen[resolved]; ok {
+			continue
+		}
+		seen[resolved] = struct{}{}
+		baseURLs = append(baseURLs, resolved)
+	}
+	if len(baseURLs) == 0 {
+		return []string{defaultReleasePageBase}
+	}
+	return baseURLs
+}
+
+func taggedReleasePageURLs(releasePageURLs []string, version string) []string {
+	return installutil.JoinURLPaths(releasePageURLs, "tag/azure-cli-"+version)
+}
+
+func taggedReleaseDownloadURLs(releasePageURLs []string, version, assetName string) []string {
+	return installutil.JoinURLPaths(releasePageURLs, "download/azure-cli-"+version+"/"+assetName)
+}
+
+func checksumForAsset(pageData []byte, assetName string) (string, error) {
+	pattern := regexp.MustCompile(`(?i)([a-f0-9]{64})\s+` + regexp.QuoteMeta(assetName))
+	matches := pattern.FindSubmatch(pageData)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("Azure CLI release page checksum for %s not found", assetName)
+	}
+	return strings.ToLower(string(matches[1])), nil
 }
 
 func assetByName(assets []releaseAsset, name string) (releaseAsset, error) {
